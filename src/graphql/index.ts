@@ -7,6 +7,7 @@ async function createApolloGraphqlServer() {
     // create graphql server
     const gqlserver = new ApolloServer({
         typeDefs: `
+        ${User.typedefs}
             type Query {
                  ${User.queries}
             }
@@ -20,6 +21,7 @@ async function createApolloGraphqlServer() {
                 // say: (_, { name }: { name: string }) => `Hey ${name}, How are you?`
 
                 ...User.resolvers.queries,
+
             },
             Mutation: {
                 // createUser: async (__, { firstName, lastName, email, password }:
