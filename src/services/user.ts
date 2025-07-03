@@ -1,74 +1,72 @@
-import { prismaClient } from "../lib/db"
-import { createHmac, randomBytes } from 'node:crypto'
-import JWT from 'jsonwebtoken'
+import { prismaClient } from "../lib/db";
+import { createHmac, randomBytes } from "node:crypto";
+import JWT from "jsonwebtoken";
 
-
-const JWT_SECRET='Y@$hv!'
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 export interface createUserPayload {
-    firstName: string
-    lastName?: string
-    email: string
-    password: string
+	firstName: string;
+	lastName?: string;
+	email: string;
+	password: string;
 }
 
 export interface getUserTokenPayload {
-    email: string
-    password: string
+	email: string;
+	password: string;
 }
 
 class UserService {
+	private static generateHash(salt: string, password: string) {
+		const hashedPassword = createHmac("sha256", salt)
+			.update(password)
+			.digest("hex");
+		return hashedPassword;
+	}
 
-    private static generateHash(salt: string, password: string){
-        const hashedPassword = createHmac('sha256', salt).update(password).digest('hex')
-        return hashedPassword
-    }
+	public static getUserById(id: string) {
+		return prismaClient.user.findUnique({ where: { id } });
+	}
 
-    public static getUserById(id: string){
-        return prismaClient.user.findUnique({where: {id}})
-    }
+	public static createUser(payload: createUserPayload) {
+		const { firstName, lastName, email, password } = payload;
 
+		const salt = randomBytes(32).toString("hex");
+		const hashedPassword = UserService.generateHash(salt, password);
 
-    public static createUser(payload: createUserPayload) {
-        const { firstName, lastName, email, password } = payload
+		return prismaClient.user.create({
+			data: {
+				firstName,
+				lastName,
+				email,
+				salt,
+				password: hashedPassword,
+			},
+		});
+	}
 
-        const salt = randomBytes(32).toString("hex");
-        const hashedPassword = UserService.generateHash(salt, password);
+	private static getUserByEmail(email: string) {
+		return prismaClient.user.findUnique({ where: { email } });
+	}
 
-        return prismaClient.user.create({
-            data: {
-                firstName,
-                lastName,
-                email,
-                salt,
-                password: hashedPassword,
-            },
-        });
-    }
+	public static async getUserToken(payload: getUserTokenPayload) {
+		const { email, password } = payload;
+		const user = await UserService.getUserByEmail(email);
+		if (!user) throw new Error("user not found");
 
-    private static getUserByEmail(email: string){
-        return prismaClient.user.findUnique({where: {email}})
-    }
+		const userSalt = user.salt;
+		const usersHashPassword = UserService.generateHash(userSalt, password);
 
-    public static async getUserToken(payload: getUserTokenPayload) {
-        const {email, password} = payload;  
-        const user = await UserService.getUserByEmail(email)
-        if(!user) throw new Error('user not found')
+		if (usersHashPassword !== user.password)
+			throw new Error("Incorrect password");
 
-            const userSalt = user.salt
-            const usersHashPassword = UserService.generateHash(userSalt, password)
+		const token = JWT.sign({ id: user.id, email: user.email }, JWT_SECRET);
+		return token;
+	}
 
-            if(usersHashPassword !== user.password)
-                throw new Error('Incorrect password')
-
-            const token = JWT.sign({id: user.id, email:user.email}, JWT_SECRET)
-            return token;
-    }
-
-    public static decodeJWTtoken(token: string){
-        return JWT.verify(token, JWT_SECRET);
-        
-    }
+	public static decodeJWTtoken(token: string) {
+		return JWT.verify(token, JWT_SECRET);
+	}
 }
 
-export default UserService
+export default UserService;
