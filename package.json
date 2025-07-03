@@ -20,6 +20,7 @@
   "dependencies": {
     "@apollo/server": "^4.12.2",
     "@as-integrations/express5": "^1.1.0",
+    "@prisma/client": "^6.11.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "graphql": "^16.11.0",
